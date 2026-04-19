@@ -16,6 +16,7 @@ block_cipher = None
 pil_datas,     pil_binaries,     pil_hiddenimports     = collect_all('PIL')
 pystray_datas, pystray_binaries, pystray_hiddenimports = collect_all('pystray')
 pa_datas,      pa_binaries,      pa_hiddenimports      = collect_all('pyaudiowpatch')
+ws_datas,      ws_binaries,      ws_hiddenimports      = collect_all('websockets')
 
 a = Analysis(
     ['ShadowBridge.py'],
@@ -24,6 +25,7 @@ a = Analysis(
         *pil_binaries,
         *pystray_binaries,
         *pa_binaries,
+        *ws_binaries,
     ],
     datas=[
         # Bundle the icon so resource_path() can find it at runtime
@@ -31,6 +33,7 @@ a = Analysis(
         *pil_datas,
         *pystray_datas,
         *pa_datas,
+        *ws_datas,
     ],
     hiddenimports=[
         # pystray Win32 backend
@@ -43,9 +46,13 @@ a = Analysis(
         # audioop is absent in Python 3.13+; the code has a fallback,
         # but include it when present so the faster path is used.
         'audioop',
+        # websockets (WS API for Stream Deck plugin)
+        'websockets',
+        'asyncio',
         *pil_hiddenimports,
         *pystray_hiddenimports,
         *pa_hiddenimports,
+        *ws_hiddenimports,
     ],
     hookspath=[],
     hooksconfig={},

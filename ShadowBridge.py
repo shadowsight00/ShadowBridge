@@ -17,6 +17,13 @@ import logging
 import datetime
 import time
 import traceback
+import asyncio
+
+try:
+    import websockets
+    WS_AVAILABLE = True
+except ImportError:
+    WS_AVAILABLE = False
 
 try:
     import pystray
@@ -502,6 +509,27 @@ class AudioEngine:
             sock.close()
             self.on_level(ch_id, 0)
 
+    def start_channel(self, ch):
+        """Start a single channel while the engine is running (for TOGGLE_CHANNEL)."""
+        if not self.running:
+            return
+        ch_id = ch['id']
+        self.channel_map[ch_id] = ch
+        if ch_id in self.streams and self.streams[ch_id].is_alive():
+            return
+        self._start_channel(ch)
+
+    def stop_channel(self, ch_id):
+        """Stop a single channel while the engine is running (for TOGGLE_CHANNEL)."""
+        if ch_id in self.stop_events:
+            self.stop_events[ch_id].set()
+        if ch_id in self.pa_streams:
+            try:
+                self.pa_streams[ch_id].stop_stream()
+            except Exception:
+                pass
+        self._set_status(ch_id, STATUS_IDLE)
+
     def _watchdog(self):
         logger.info("Watchdog active.")
         while self.running:
@@ -681,6 +709,106 @@ class PeerDiscovery:
                         fire_lost = True
             if fire_lost and self._running:  # don't fire after stop
                 self.on_peer_lost()
+
+
+class WsServer:
+    PORT = 8765
+
+    def __init__(self, app):
+        self._app            = app
+        self._loop           = None
+        self._clients        = set()
+        self._cached_status  = None   # JSON string, always built on the main thread
+
+    def start(self):
+        threading.Thread(target=self._run_loop, daemon=True).start()
+
+    def _run_loop(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_until_complete(self._serve())
+
+    async def _serve(self):
+        try:
+            async with websockets.serve(self._handler, "localhost", self.PORT):
+                logger.success(f"WS API: ws://localhost:{self.PORT}")
+                await asyncio.Future()
+        except Exception as e:
+            logger.error(f"WsServer: {e}")
+
+    async def _handler(self, ws):
+        self._clients.add(ws)
+        try:
+            if self._cached_status:
+                await ws.send("STATUS " + self._cached_status)
+            else:
+                self._app.root.after(0, self.push_status)
+            async for msg in ws:
+                self._dispatch(msg.strip())
+        except Exception:
+            pass
+        finally:
+            self._clients.discard(ws)
+
+    def _dispatch(self, msg):
+        if msg == "START":
+            self._app.root.after(0, self._app._start)
+        elif msg == "STOP":
+            self._app.root.after(0, self._app._stop)
+        elif msg.startswith("TOGGLE_CHANNEL "):
+            ch_id = msg[len("TOGGLE_CHANNEL "):]
+            self._app.root.after(0, lambda cid=ch_id: self._app._toggle_channel(cid))
+        elif msg.startswith("SET_VOLUME "):
+            parts = msg.split()
+            logger.info(f"WS RX: {msg!r}")
+            if len(parts) == 3:
+                try:
+                    vol = max(0, min(100, int(parts[2])))
+                    ch_id = parts[1]
+                    logger.info(f"SET_VOLUME dispatching: id={ch_id} vol={vol}")
+                    self._app.root.after(0, lambda cid=ch_id, v=vol: self._app._set_volume(cid, v))
+                except ValueError:
+                    logger.warning(f"SET_VOLUME: bad volume value in {msg!r}")
+            else:
+                logger.warning(f"SET_VOLUME: malformed message {msg!r}")
+
+    def push_status(self):
+        """Must be called from the main (tkinter) thread."""
+        payload = json.dumps(self._build_status())
+        self._cached_status = payload
+        if self._loop is None or not self._clients:
+            return
+        asyncio.run_coroutine_threadsafe(
+            self._broadcast("STATUS " + payload), self._loop
+        )
+
+    def _build_status(self):
+        channels = []
+        for ch in self._app._channels():
+            ch_id = ch['id']
+            row   = self._app.rows.get(ch_id)
+            channels.append({
+                "id":      ch_id,
+                "name":    ch['name'],
+                "enabled": ch.get('enabled', True),
+                "volume":  ch.get('volume', 100),
+                "level":   round(row.smooth_level, 3) if row else 0.0,
+                "status":  self._app.engine.statuses.get(ch_id, STATUS_IDLE),
+            })
+        return {
+            "running":        self._app.engine.running,
+            "peer_connected": self._app._discovery.is_peer_connected(),
+            "channels":       channels,
+        }
+
+    async def _broadcast(self, msg):
+        dead = set()
+        for ws in list(self._clients):
+            try:
+                await ws.send(msg)
+            except Exception:
+                dead.add(ws)
+        self._clients -= dead
 
 
 class ChannelRow(tk.Frame):
@@ -909,6 +1037,12 @@ class ChannelRow(tk.Frame):
         self._vol_pct_lbl.config(text=f"{v}%")
         self._vol_redraw()
         self.on_change()
+
+    def set_volume(self, vol: int) -> None:
+        """Update slider position and label from an external source (e.g. WS command)."""
+        self.vol_var.set(vol)
+        self._vol_pct_lbl.config(text=f"{vol}%")
+        self._vol_redraw()
 
     def _toggle_advanced(self):
         self._adv_open = not self._adv_open
@@ -1246,6 +1380,9 @@ class ShadowBridgeApp:
             on_command=self._on_remote_command,
         )
         self._discovery.start()
+        self._ws_server = WsServer(self) if WS_AVAILABLE else None
+        if not WS_AVAILABLE:
+            logger.warning("websockets not installed — Stream Deck WS API disabled.")
         self._refresh_channels()
 
     def _init_config(self):
@@ -1678,6 +1815,8 @@ class ShadowBridgeApp:
         else:
             logger.info("_start(): step 5 — send_remote=False, NOT sending CMD:START (remote-triggered).")
 
+        if self._ws_server:
+            self._ws_server.push_status()
         logger.info("_start(): all steps complete.")
 
     def _stop(self, send_remote=True):
@@ -1721,6 +1860,8 @@ class ShadowBridgeApp:
         # Step 6 — clear shutdown flag so discovery peer callbacks re-enable.
         # Discovery never stopped, so the peer status bar stays live.
         self._shutting_down = False
+        if self._ws_server:
+            self._ws_server.push_status()
         logger.info("_stop(): all stop steps completed.")
 
     def _on_status_change(self, ch_id, status):
@@ -1733,6 +1874,8 @@ class ShadowBridgeApp:
             return
         if ch_id in self.rows:
             self.rows[ch_id].set_status(status)
+        if self._ws_server:
+            self._ws_server.push_status()
 
     def _on_level(self, ch_id, level):
         if self._shutting_down or not self._streams_active or not self._app_alive:
@@ -1920,10 +2063,14 @@ class ShadowBridgeApp:
                 self._update_mode_ui()
         logger.success(f"Peer discovered: {peer_mode or 'unknown'} PC at {peer_ip}")
         self._update_peer_status(True, peer_ip, peer_mode)
+        if self._ws_server:
+            self._ws_server.push_status()
 
     def _handle_peer_lost(self):
         logger.warning("Peer connection lost — searching...")
         self._update_peer_status(False, None, None)
+        if self._ws_server:
+            self._ws_server.push_status()
 
     def _apply_port_sync(self, peer_channels):
         if not self._streams_active:
@@ -1941,6 +2088,47 @@ class ShadowBridgeApp:
             save_config(self.cfg)
             self._refresh_channels()
             logger.info("Port assignments synced with peer.")
+
+    def _toggle_channel(self, ch_id):
+        ch = next((c for c in self._channels() if c['id'] == ch_id), None)
+        if ch is None:
+            logger.warning(f"TOGGLE_CHANNEL: unknown id {ch_id}")
+            return
+        ch['enabled'] = not ch.get('enabled', True)
+        save_config(self.cfg)
+        if ch_id in self.rows:
+            self.rows[ch_id]._apply_enable_state()
+        if self.engine.running:
+            if ch['enabled']:
+                self.engine.start_channel(ch)
+            else:
+                self.engine.stop_channel(ch_id)
+        if self._ws_server:
+            self._ws_server.push_status()
+        logger.info(f"Channel '{ch['name']}' toggled {'ON' if ch['enabled'] else 'OFF'} via WS.")
+
+    def _set_volume(self, ch_id, vol):
+        known = [(c['id'], c['name']) for c in self._channels()]
+        logger.info(f"_set_volume: looking for id={ch_id!r} among {len(known)} channels: {known}")
+        ch = next((c for c in self._channels() if c['id'] == ch_id), None)
+        if ch is None:
+            logger.warning(f"SET_VOLUME: id {ch_id!r} not found. Known IDs: {[k[0] for k in known]}")
+            return
+        old_vol = ch.get('volume', 100)
+        ch['volume'] = vol
+        save_config(self.cfg)
+        engine_updated = False
+        if self.engine.running and ch_id in self.engine.channel_map:
+            self.engine.channel_map[ch_id]['volume'] = vol
+            engine_updated = True
+        if ch_id in self.rows:
+            try:
+                self.rows[ch_id].set_volume(vol)
+            except Exception:
+                pass
+        if self._ws_server:
+            self._ws_server.push_status()
+        logger.success(f"SET_VOLUME applied: '{ch['name']}' {old_vol}% → {vol}% (engine_updated={engine_updated})")
 
     def _on_remote_command(self, cmd, sender_ip):
         # Called on the discovery listener background thread — delegate immediately.
@@ -1979,6 +2167,8 @@ class ShadowBridgeApp:
         logger.info(f"This PC: {get_local_ip()}")
         logger.info(f"Config: {CFG_FILE}")
         logger.info(f"Logs:   {LOG_DIR}")
+        if self._ws_server:
+            self._ws_server.start()
         try:
             self.root.mainloop()
         except Exception:

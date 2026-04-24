@@ -8,18 +8,18 @@ ShadowBridge is a lightweight Windows application designed for dual PC streaming
 
 ## Features
 
-- **One-click start/stop** — clicking Start All on either PC starts both simultaneously
-- **Auto peer discovery** — both PCs find each other automatically on your local network, no manual IP configuration required
-- **Per-channel audio routing** — route game audio, Discord, Spotify, music, alerts, and more as individual channels
-- **Mic routing** — send your microphone audio back to your gaming PC for use in Discord
-- **Per-channel volume control** — adjust levels independently for each channel
-- **Per-channel enable/disable** — toggle individual channels without stopping everything
-- **Live level meters** — see audio activity on every channel in real time
-- **System tray support** — minimizes to tray, stays out of your way while you stream
-- **Dark and light mode** — switch themes from the settings menu
-- **Resizable window** — scale from compact to fullscreen
-- **Auto-reconnect** — dropped channels reconnect automatically without restarting
-- **Persistent config** — your channel layout and settings are saved between sessions
+- **One-click start/stop** : clicking Start All on either PC starts both simultaneously
+- **Auto peer discovery** : both PCs find each other automatically on your local network, no manual IP configuration required
+- **Per-channel audio routing** : route game audio, Discord, Spotify, music, alerts, and more as individual channels
+- **Mic routing** : send your microphone audio back to your gaming PC for use in Discord
+- **Per-channel volume control** : adjust levels independently for each channel
+- **Per-channel enable/disable** : toggle individual channels without stopping everything
+- **Live level meters** : see audio activity on every channel in real time
+- **System tray support** : minimizes to tray, stays out of your way while you stream
+- **Dark and light mode** : switch themes from the settings menu
+- **Resizable window** : scale from compact to fullscreen
+- **Auto-reconnect** : dropped channels reconnect automatically without restarting
+- **Persistent config** : your channel layout and settings are saved between sessions
 
 ---
 
@@ -27,7 +27,7 @@ ShadowBridge is a lightweight Windows application designed for dual PC streaming
 
 - Windows 10 or Windows 11 (both PCs)
 - Virtual audio devices installed on both computers
-  - **WaveLink** (recommended — works out of the box with Elgato hardware)
+  - **WaveLink** (recommended. Works out of the box with Elgato hardware)
   - Other virtual audio software such as Voicemeeter should also work
 - Both PCs connected to the same local network
 
@@ -39,7 +39,7 @@ ShadowBridge is a lightweight Windows application designed for dual PC streaming
 2. Run the installer on **both** your gaming PC and your streaming PC
 3. Launch ShadowBridge on both machines
 4. The app will automatically detect which PC it's on and configure itself accordingly
-5. Click **Start All** on either PC — both will start simultaneously
+5. Click **Start All** on either PC. Both will start simultaneously
 
 ---
 
@@ -53,9 +53,9 @@ When you open ShadowBridge for the first time, it will attempt to detect whether
 
 Each channel represents one audio stream between your two PCs:
 
-- **Outgoing channels** — capture audio from a virtual audio device on the gaming PC and send it to the streaming PC
-- **Incoming channels** — receive audio from the gaming PC and play it to a virtual audio device on the streaming PC
-- **Mic channels** — capture microphone input on the streaming PC and send it back to the gaming PC
+- **Outgoing channels** : capture audio from a virtual audio device on the gaming PC and send it to the streaming PC
+- **Incoming channels** : receive audio from the gaming PC and play it to a virtual audio device on the streaming PC
+- **Mic channels** : capture microphone input on the streaming PC and send it back to the gaming PC
 
 To set up a channel:
 1. Click **Change** on the channel to select your virtual audio device
@@ -70,7 +70,7 @@ To route your microphone from your streaming PC to your gaming PC for Discord:
 1. On the gaming PC, add a new channel and set its direction to **Mic**
 2. Select your WaveLink mic input device (e.g. `Mic In (Elgato Wave:XLR)`) as the output device
 3. In Discord on your gaming PC, set WaveLink (e.g. `Mic SPC Audio`) as your input device
-4. Hit Start All — your mic audio will now route through to Discord automatically
+4. Hit Start All. Your mic audio will now route through to Discord automatically
 
 ### Settings
 
@@ -82,7 +82,7 @@ Open the **Settings** panel from the top bar to configure:
 
 ## Roadmap
 
-- Per-app audio capture (WASAPI) — route audio directly from specific applications without needing virtual audio devices on the gaming PC
+- Per-app audio capture (WASAPI) : Route audio directly from specific applications without needing virtual audio devices on the gaming PC
 - Channel grouping and presets
 - Auto-launch on Windows startup
 - Volume normalization per channel

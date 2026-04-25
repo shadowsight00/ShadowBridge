@@ -3,9 +3,10 @@
 ; Output: Output\ShadowBridge_Setup.exe
 
 #define AppName      "ShadowBridge"
-#define AppVersion   "0.3.1"
+#define AppVersion   "0.4.0"
 #define AppPublisher "Your Name or Company"
 #define AppExeName   "ShadowBridge.exe"
+#define AppIcoName   "shadowbridge_icon.ico"
 #define AppDataDir   "{userdocs}\ShadowBridge"
 
 [Setup]
@@ -19,8 +20,8 @@ DefaultGroupName={#AppName}
 AllowNoIcons=yes
 OutputDir=Output
 OutputBaseFilename=ShadowBridge_Setup
-SetupIconFile=audiobridge_icon.ico
-UninstallDisplayIcon={app}\audiobridge_icon.ico
+SetupIconFile=shadowbridge_icon.ico
+UninstallDisplayIcon={app}\{#AppIcoName}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -37,21 +38,21 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-; Main executable
-Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Main executable — pulled from dist/ after running build.bat / PyInstaller
+Source: "C:\Users\ajsme\OneDrive\Documents\GitHub\ShadowBridge\dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Icon (used by shortcuts and the uninstaller entry)
-Source: "audiobridge_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\ajsme\OneDrive\Documents\GitHub\ShadowBridge\{#AppIcoName}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu shortcut
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\audiobridge_icon.ico"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppIcoName}"
 
 ; Start Menu uninstall shortcut
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 
 ; Optional Desktop shortcut (only created when user ticks the task)
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\audiobridge_icon.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppIcoName}"; Tasks: desktopicon
 
 [Dirs]
 ; Create the user data folder on first install so the app can write config
@@ -60,6 +61,9 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename:
 Name: "{userdocs}\{#AppName}"; Flags: uninsneveruninstall
 
 [Run]
+; Refresh Windows icon cache so new icon appears immediately in Start Menu / Desktop.
+Filename: "ie4uinit.exe"; Parameters: "-show"; Flags: runhidden nowait
+
 ; Offer to launch the app after installation finishes.
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 

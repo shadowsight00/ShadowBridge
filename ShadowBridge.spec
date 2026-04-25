@@ -13,10 +13,12 @@ block_cipher = None
 
 # Collect all sub-modules, data files, and binaries for packages that
 # PyInstaller can't fully discover through static import analysis.
-pil_datas,     pil_binaries,     pil_hiddenimports     = collect_all('PIL')
-pystray_datas, pystray_binaries, pystray_hiddenimports = collect_all('pystray')
-pa_datas,      pa_binaries,      pa_hiddenimports      = collect_all('pyaudiowpatch')
-ws_datas,      ws_binaries,      ws_hiddenimports      = collect_all('websockets')
+pil_datas,      pil_binaries,      pil_hiddenimports      = collect_all('PIL')
+pystray_datas,  pystray_binaries,  pystray_hiddenimports  = collect_all('pystray')
+pa_datas,       pa_binaries,       pa_hiddenimports       = collect_all('pyaudiowpatch')
+ws_datas,       ws_binaries,       ws_hiddenimports       = collect_all('websockets')
+pycaw_datas,    pycaw_binaries,    pycaw_hiddenimports    = collect_all('pycaw')
+winotify_datas, winotify_binaries, winotify_hiddenimports = collect_all('winotify')
 
 a = Analysis(
     ['ShadowBridge.py'],
@@ -26,14 +28,19 @@ a = Analysis(
         *pystray_binaries,
         *pa_binaries,
         *ws_binaries,
+        *pycaw_binaries,
+        *winotify_binaries,
     ],
     datas=[
         # Bundle the icon so resource_path() can find it at runtime
-        ('audiobridge_icon.ico', '.'),
+        (r'C:\Users\ajsme\OneDrive\Documents\GitHub\ShadowBridge\shadowbridge_icon.ico', '.'),
+        (r'C:\Users\ajsme\OneDrive\Documents\GitHub\ShadowBridge\shadowbridge_icon.png', '.'),
         *pil_datas,
         *pystray_datas,
         *pa_datas,
         *ws_datas,
+        *pycaw_datas,
+        *winotify_datas,
     ],
     hiddenimports=[
         # pystray Win32 backend
@@ -49,10 +56,30 @@ a = Analysis(
         # websockets (WS API for Stream Deck plugin)
         'websockets',
         'asyncio',
+        # pycaw — Windows Core Audio API for per-process audio session enumeration
+        'pycaw',
+        'pycaw.pycaw',
+        'comtypes',
+        'comtypes.client',
+        'psutil',
+        # winotify — Windows toast notifications
+        'winotify',
+        'winotify.audio',
+        'winotify.communication',
+        'winotify._communication',
+        'winotify._notify',
+        'winotify._registry',
+        # plyer (kept for spec completeness; winotify is the active backend)
+        'plyer',
+        'plyer.platforms',
+        'plyer.platforms.win',
+        'plyer.platforms.win.notification',
         *pil_hiddenimports,
         *pystray_hiddenimports,
         *pa_hiddenimports,
         *ws_hiddenimports,
+        *pycaw_hiddenimports,
+        *winotify_hiddenimports,
     ],
     hookspath=[],
     hooksconfig={},
@@ -89,7 +116,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='audiobridge_icon.ico',
+    icon=r'C:\Users\ajsme\OneDrive\Documents\GitHub\ShadowBridge\shadowbridge_icon.ico',
 )
 
 # ── Post-build ──────────────────────────────────────────────────────────────

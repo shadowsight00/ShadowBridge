@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@elgato/streamdeck@2/ui/streamdeck.css">
+</head>
+<body>
+  <div class="sdpi-wrapper">
+    <div class="sdpi-item">
+      <div class="sdpi-item-label">Channel</div>
+      <select class="sdpi-item-value" id="channelSelect">
+        <option value="">-- Select a channel --</option>
+      </select>
+    </div>
+    <div class="sdpi-item" id="status-row">
+      <div class="sdpi-item-label">ShadowBridge</div>
+      <span class="sdpi-item-value" id="status">Connecting...</span>
+    </div>
+  </div>
+
+  <script>
+    const ws = new WebSocket('ws://localhost:8765');
+    let settings = {};
+
+    ws.onopen = () => {
+      document.getElementById('status').textContent = 'Connected';
+      ws.send(JSON.stringify({ cmd: 'get_state' }));
+    };
+
+    ws.onclose = () => {
+      document.getElementById('status').textContent = 'ShadowBridge not running';
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.event === 'state') {
+        const select = document.getElementById('channelSelect');
+        const current = settings.channelId;
+        select.innerHTML = '<option value="">-- Select a channel --</option>';
+        msg.channels.forEach(ch => {
+          const opt = document.createElement('option');
+          opt.value = ch.id;
+          opt.textContent = `${ch.name} (${ch.direction})`;
+          if (ch.id === current) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
+    };
+
+    document.getElementById('channelSelect').addEventListener('change', (e) => {
+      settings.channelId = e.target.value;
+      window.sendValueToPlugin('setSettings', settings);
+    });
+
+    window.connectElgatoStreamDeckSocket = (port, uuid, registerEvent, info, actionInfo) => {
+      settings = JSON.parse(actionInfo).payload.settings || {};
+      const sdWs = new WebSocket(`ws://localhost:${port}`);
+      sdWs.onopen = () => sdWs.send(JSON.stringify({ event: registerEvent, uuid }));
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@elgato/streamdeck@2/ui/streamdeck.css">
+</head>
+<body>
+  <div class="sdpi-wrapper">
+    <div class="sdpi-item">
+      <div class="sdpi-item-label">ShadowBridge</div>
+      <span class="sdpi-item-value" id="status">Connecting...</span>
+    </div>
+  </div>
+  <script>
+    const ws = new WebSocket('ws://localhost:8765');
+    ws.onopen = () => { document.getElementById('status').textContent = 'Connected'; };
+    ws.onclose = () => { document.getElementById('status').textContent = 'ShadowBridge not running'; };
+    window.connectElgatoStreamDeckSocket = (port, uuid, registerEvent) => {
+      const sdWs = new WebSocket(`ws://localhost:${port}`);
+      sdWs.onopen = () => sdWs.send(JSON.stringify({ event: registerEvent, uuid }));
+    };
+  </script>
+</body>
+</html>

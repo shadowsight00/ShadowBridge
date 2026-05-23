@@ -1,0 +1,67 @@
+{
+  "Author": "ShadowBridge",
+  "CodePath": "bin/plugin.js",
+  "Description": "Control ShadowBridge dual-PC audio routing from your Stream Deck",
+  "Icon": "imgs/plugin/icon",
+  "Name": "ShadowBridge",
+  "Category": "ShadowBridge",
+  "Version": "1.0.0.0",
+  "UUID": "com.shadowbridge.app",
+  "SDKVersion": 2,
+  "Software": { "MinimumVersion": "6.4" },
+  "OS": [{ "Platform": "windows", "MinimumVersion": "10" }],
+  "Nodejs": { "Version": "20", "Debug": "enabled" },
+  "Actions": [
+    {
+      "Name": "Toggle Streaming",
+      "UUID": "com.shadowbridge.app.toggle-streaming",
+      "Icon": "imgs/actions/toggle-streaming/key",
+      "Tooltip": "Start or stop all ShadowBridge audio streams",
+      "Controllers": ["Keypad"],
+      "States": [
+        { "Image": "imgs/actions/toggle-streaming/key", "Title": "START" },
+        { "Image": "imgs/actions/toggle-streaming/key", "Title": "LIVE" },
+        { "Image": "imgs/actions/toggle-streaming/key", "Title": "OFFLINE" }
+      ]
+    },
+    {
+      "Name": "Toggle Channel",
+      "UUID": "com.shadowbridge.app.toggle-channel",
+      "Icon": "imgs/actions/toggle-channel/key",
+      "Tooltip": "Toggle a ShadowBridge audio channel on or off",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/toggle-channel.html",
+      "States": [
+        { "Image": "imgs/actions/toggle-channel/key", "Title": "" },
+        { "Image": "imgs/actions/toggle-channel/key", "Title": "" }
+      ]
+    },
+    {
+      "Name": "Connection Status",
+      "UUID": "com.shadowbridge.app.connection-status",
+      "Icon": "imgs/actions/connection-status/key",
+      "Tooltip": "Shows ShadowBridge peer connection status",
+      "Controllers": ["Keypad"],
+      "States": [
+        { "Image": "imgs/actions/connection-status/key", "Title": "SEARCHING" },
+        { "Image": "imgs/actions/connection-status/key", "Title": "PEER\nONLINE" },
+        { "Image": "imgs/actions/connection-status/key", "Title": "APP\nOFFLINE" }
+      ]
+    },
+    {
+      "Name": "Channel Volume",
+      "UUID": "com.shadowbridge.app.channel-volume",
+      "Icon": "imgs/actions/toggle-channel/key",
+      "Tooltip": "Adjust a ShadowBridge channel volume with the dial",
+      "Controllers": ["Encoder"],
+      "PropertyInspectorPath": "ui/toggle-channel.html",
+      "States": [
+        { "Image": "imgs/actions/toggle-channel/key" }
+      ],
+      "Encoder": {
+        "layout": "$B2",
+        "TriggerDescription": { "Rotate": "Adjust volume", "Push": "Reset to 100%" }
+      }
+    }
+  ]
+}

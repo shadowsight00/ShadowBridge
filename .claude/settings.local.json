@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check *)",
+      "Bash(npm run *)",
+      "Bash(echo \"Dev server starting in background \\(PID $!\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":1420\")",
+      "Bash(taskkill /PID 35444 /F)",
+      "Bash(taskkill /IM shadowbridge.exe /F)",
+      "PowerShell(Stop-Process *)",
+      "Bash(cmd *)"
+    ]
+  }
+}

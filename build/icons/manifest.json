@@ -1,0 +1,156 @@
+{
+  "brand": [
+    {
+      "id": "discord",
+      "label": "Discord",
+      "color": "#5865F2",
+      "src": "/icons/discord.png"
+    },
+    {
+      "id": "spotify",
+      "label": "Spotify",
+      "color": "#1ED760",
+      "src": "/icons/spotify.png"
+    },
+    {
+      "id": "twitch",
+      "label": "Twitch",
+      "color": "#9146FF",
+      "src": "/icons/twitch.png"
+    },
+    {
+      "id": "obsstudio",
+      "label": "OBS Studio",
+      "color": "#FFFFFF",
+      "src": "/icons/obsstudio.png"
+    },
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "color": "#FF0000",
+      "src": "/icons/youtube.png"
+    },
+    {
+      "id": "googlechrome",
+      "label": "Chrome",
+      "color": "#4285F4",
+      "src": "/icons/googlechrome.png"
+    },
+    {
+      "id": "steam",
+      "label": "Steam",
+      "color": "#C7D5E0",
+      "src": "/icons/steam.png"
+    },
+    {
+      "id": "vlcmediaplayer",
+      "label": "VLC",
+      "color": "#FF8800",
+      "src": "/icons/vlcmediaplayer.png"
+    },
+    {
+      "id": "teamspeak",
+      "label": "TeamSpeak",
+      "color": "#4B69B6",
+      "src": "/icons/teamspeak.png"
+    },
+    {
+      "id": "teamviewer",
+      "label": "TeamViewer",
+      "color": "#050A52",
+      "src": "/icons/teamviewer.png"
+    }
+  ],
+  "audio": [
+    {
+      "id": "microphone",
+      "label": "Microphone",
+      "color": "#FF6B6B",
+      "src": "/icons/microphone.png"
+    },
+    {
+      "id": "headphones",
+      "label": "Headphones",
+      "color": "#60A5FA",
+      "src": "/icons/headphones.png"
+    },
+    {
+      "id": "headset",
+      "label": "Headset",
+      "color": "#818CF8",
+      "src": "/icons/headset.png"
+    },
+    {
+      "id": "speaker",
+      "label": "Speaker",
+      "color": "#FB923C",
+      "src": "/icons/speaker.png"
+    },
+    {
+      "id": "gamepad",
+      "label": "Game Audio",
+      "color": "#4ADE80",
+      "src": "/icons/gamepad.png"
+    },
+    {
+      "id": "bell",
+      "label": "Alerts",
+      "color": "#FCD34D",
+      "src": "/icons/bell.png"
+    },
+    {
+      "id": "music",
+      "label": "Music",
+      "color": "#C084FC",
+      "src": "/icons/music.png"
+    },
+    {
+      "id": "waveform",
+      "label": "Audio",
+      "color": "#22D3EE",
+      "src": "/icons/waveform.png"
+    },
+    {
+      "id": "podcast",
+      "label": "Podcast",
+      "color": "#F472B6",
+      "src": "/icons/podcast.png"
+    },
+    {
+      "id": "phone",
+      "label": "Phone",
+      "color": "#34D399",
+      "src": "/icons/phone.png"
+    },
+    {
+      "id": "video",
+      "label": "Video",
+      "color": "#F87171",
+      "src": "/icons/video.png"
+    },
+    {
+      "id": "system",
+      "label": "System",
+      "color": "#94A3B8",
+      "src": "/icons/system.png"
+    },
+    {
+      "id": "equalizer",
+      "label": "EQ / Mixer",
+      "color": "#2DD4BF",
+      "src": "/icons/equalizer.png"
+    },
+    {
+      "id": "alert",
+      "label": "Stream Alert",
+      "color": "#FBBF24",
+      "src": "/icons/alert.png"
+    },
+    {
+      "id": "voice",
+      "label": "Voice Chat",
+      "color": "#38BDF8",
+      "src": "/icons/voice.png"
+    }
+  ]
+}

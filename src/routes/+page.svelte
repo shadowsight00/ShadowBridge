@@ -9,6 +9,7 @@
   import ChannelInfo   from '$lib/modals/ChannelInfo.svelte';
 
   import { invoke } from '@tauri-apps/api/core';
+  import { getVersion } from '@tauri-apps/api/app';
 
   import { BRAND_ICONS } from '$lib/icons.js';
   import { listen } from '@tauri-apps/api/event';
@@ -21,6 +22,8 @@
   } from '$lib/store.svelte.js';
 
   let configLoaded = $state(false);
+  let appVersion = $state('');
+  $effect(() => { getVersion().then(v => { appVersion = 'v' + v; }); });
   let _saveTimer;
   let _monitorTimer;
 
@@ -773,7 +776,7 @@
 
 <!-- ── Sys bar ─────────────────────────────────────────────────────────────────── -->
 <div class="sysbar">
-  <span>v0.4.0</span>
+  <span>{appVersion}</span>
   <span class="sys-status">SYS: {engineRunning.value ? 'RUNNING' : 'NOMINAL'}</span>
 </div>
 

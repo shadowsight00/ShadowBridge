@@ -283,7 +283,9 @@ pub fn restart_engine_channel(
 
 #[tauri::command]
 pub fn set_channel_volume(state: State<'_, AppState>, channel_id: String, volume: f32) {
-    state.engine.lock().set_volume(&channel_id, volume / 100.0);
+    let vol_frac = volume / 100.0;
+    state.engine.lock().set_volume(&channel_id, vol_frac);
+    state.monitor.lock().set_volume(&channel_id, vol_frac);
     {
         let mut cfg = state.config.lock();
         let channels = if cfg.mode == "gaming" {

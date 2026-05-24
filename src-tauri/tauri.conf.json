@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ShadowBridge",
-  "version": "0.4.0",
+  "version": "1.0.1",
   "identifier": "com.shadowbridge.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ShadowBridge v0.4.0",
+        "title": "ShadowBridge v1.0.1",
         "width": 1280,
         "height": 760,
         "minWidth": 900,

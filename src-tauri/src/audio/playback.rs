@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
-    Device, Stream, StreamConfig,
+    Device, Stream, StreamConfig, StreamError,
 };
 use crossbeam_channel::Receiver;
 use parking_lot::Mutex;
@@ -12,6 +12,16 @@ use std::{
         Arc,
     },
 };
+
+fn is_underrun_error(err: &StreamError) -> bool {
+    match err {
+        StreamError::BackendSpecific { err } => {
+            let d = err.description.to_lowercase();
+            d.contains("underrun") || d.contains("xrun") || d.contains("buffer")
+        }
+        StreamError::DeviceNotAvailable => false,
+    }
+}
 
 pub struct PlaybackStream {
     _stream: Stream,
@@ -31,7 +41,12 @@ impl PlaybackStream {
         let buf: Arc<Mutex<VecDeque<f32>>> =
             Arc::new(Mutex::new(VecDeque::with_capacity(96_000)));
 
-        let ready = Arc::new(AtomicBool::new(false));
+        // Pre-fill with silence so the buffer has headroom before audio arrives.
+        {
+            let mut b = buf.lock();
+            b.extend(std::iter::repeat(0.0f32).take(prebuffer_samples));
+        }
+        let ready = Arc::new(AtomicBool::new(true));
 
         let buf_fill  = Arc::clone(&buf);
         let ready_set = Arc::clone(&ready);
@@ -68,7 +83,13 @@ impl PlaybackStream {
                     out.fill(0.0);
                 }
             },
-            |err| log::error!("playback stream error: {err}"),
+            |err| {
+                if is_underrun_error(&err) {
+                    log::warn!("MICOUT buffer underrun — continuing");
+                } else {
+                    log::error!("playback stream error: {err}");
+                }
+            },
             None,
         )?;
         stream.play()?;

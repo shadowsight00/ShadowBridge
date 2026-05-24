@@ -188,6 +188,13 @@ impl AudioEngine {
                 let dev_name  = ch.device.clone();
                 let app_cap   = app.clone();
                 std::thread::spawn(move || {
+                    #[cfg(windows)]
+                    unsafe {
+                        use windows::Win32::System::Threading::{
+                            GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
+                        };
+                        let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+                    }
                     if let Err(e) = mic_capture_thread(dev_name, tx, stop_cap.clone(), app_cap.clone()) {
                         if !stop_cap.load(Ordering::SeqCst) {
                             log::error!("[{name}] mic capture exited: {e}");
@@ -200,7 +207,16 @@ impl AudioEngine {
                 let dest = format!("{}:{}", self.dest_ip, ch.port);
                 let app_c = app.clone(); let ch_id = ch.id.clone(); let ch_name = ch.name.clone();
                 let vol2 = Arc::clone(&vol); let stop2 = Arc::clone(&stop);
-                std::thread::spawn(move || { sender_thread(ch_id, ch_name, rx, dest, vol2, stop2, app_c); });
+                std::thread::spawn(move || {
+                    #[cfg(windows)]
+                    unsafe {
+                        use windows::Win32::System::Threading::{
+                            GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
+                        };
+                        let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+                    }
+                    sender_thread(ch_id, ch_name, rx, dest, vol2, stop2, app_c);
+                });
             }
 
             "IN" | "MIC" => {
@@ -220,7 +236,8 @@ impl AudioEngine {
                         return;
                     }
                 };
-                let prebuffer = (self.buffer_offset_ms as usize * self.sample_rate as usize / 1000) * 2;
+                let min_buffer_ms = self.buffer_offset_ms.max(100) as usize;
+                let prebuffer = (min_buffer_ms * self.sample_rate as usize / 1000) * 2;
                 let cfg = preferred_config(&device.default_output_config(), &ch.name, self.sample_rate, self.buffer_size, false);
                 let (ptx, prx) = crossbeam_channel::bounded::<Vec<f32>>(64);
                 match PlaybackStream::new(&device, &cfg, prx, prebuffer) {
@@ -289,6 +306,14 @@ fn find_output_device(host: &cpal::Host, name: &str) -> Option<cpal::Device> {
         .and_then(|mut it| it.find(|d| d.name().ok().as_deref() == Some(name)))
 }
 
+/// Logarithmic volume taper: 0%→0.0, 15%≈0.056 (−25 dB), 50%≈0.178 (−15 dB), 100%→1.0.
+/// `frac` is the raw 0.0–1.0 value stored in the AtomicU32 (divided by 10 000).
+pub(super) fn vol_to_multiplier(frac: f32) -> f32 {
+    if frac <= 0.0 { return 0.0; }
+    if frac >= 1.0 { return 1.0; }
+    10.0_f32.powf((frac - 1.0) * 1.5)
+}
+
 // ── Per-channel threads ───────────────────────────────────────────────────────
 
 fn sender_thread(
@@ -326,8 +351,10 @@ fn sender_thread(
         if stop.load(Ordering::SeqCst) { break; }
         match rx.recv_timeout(Duration::from_millis(50)) {
             Ok(mut samples) => {
-                let volume = vol.load(Ordering::Relaxed) as f32 / 10_000.0;
-                if volume != 1.0 { for s in &mut samples { *s *= volume; } }
+                let vol_frac   = vol.load(Ordering::Relaxed) as f32 / 10_000.0;
+                let multiplier = vol_to_multiplier(vol_frac);
+                log::debug!("[{ch_id}] vol={:.0}% multiplier={:.4}", vol_frac * 100.0, multiplier);
+                for s in &mut samples { *s *= multiplier; }
                 meter.push(&samples);
 
                 let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
@@ -371,7 +398,7 @@ fn receiver_thread(
             return;
         }
     };
-    socket.set_read_timeout(Some(Duration::from_millis(50))).ok();
+    socket.set_read_timeout(Some(Duration::from_secs(2))).ok();
     let _ = app.emit("engine-log", serde_json::json!({ "message": format!("RECV '{ch_name}' ← {bind_addr}") }));
     let _ = app.emit("channel-status", serde_json::json!({ "id": ch_id, "status": "active" }));
     crate::websocket::broadcast(&ws, serde_json::json!({"event":"channel_status","id":ch_id,"status":"active"}).to_string());
@@ -395,9 +422,10 @@ fn receiver_thread(
                         "message": format!("RECV '{ch_name}' ← first packet from {src} ({n} bytes) on {bind_addr}")
                     }));
                 }
-                let volume = vol.load(Ordering::Relaxed) as f32 / 10_000.0;
+                let vol_frac   = vol.load(Ordering::Relaxed) as f32 / 10_000.0;
+                let multiplier = vol_to_multiplier(vol_frac);
                 let samples: Vec<f32> = buf[..n].chunks_exact(4)
-                    .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]) * volume)
+                    .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]) * multiplier)
                     .collect();
                 meter.push(&samples);
                 let _ = tx.try_send(samples);

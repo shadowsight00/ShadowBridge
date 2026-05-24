@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -18,6 +18,7 @@ struct ChannelEntry {
     config_tx:   crossbeam_channel::Sender<ChannelConfig>,
     stop:        Arc<AtomicBool>,
     last_config: ChannelConfig,
+    vol:         Arc<AtomicU32>, // live volume shared with set_volume()
 }
 
 pub struct MonitoringEngine {
@@ -49,10 +50,11 @@ impl MonitoringEngine {
         }
     }
 
-    /// Force-restart monitoring for one channel immediately, regardless of
-    /// whether the config looks different from the last known value.
+    /// Force-restart monitoring for one channel immediately.
     pub fn restart_channel(&mut self, cfg: ChannelConfig, app: tauri::AppHandle) {
         if let Some(entry) = self.channels.get_mut(&cfg.id) {
+            // Sync vol so the meter reflects any volume baked into this config.
+            entry.vol.store(vol_raw(cfg.volume), Ordering::Relaxed);
             entry.last_config = cfg.clone();
             let _ = entry.config_tx.try_send(cfg);
         } else {
@@ -60,25 +62,40 @@ impl MonitoringEngine {
         }
     }
 
+    /// Update the live volume for a channel (called from set_channel_volume).
+    /// `vol_frac` is 0.0–1.0 (same scale as AudioEngine::set_volume).
+    pub fn set_volume(&self, channel_id: &str, vol_frac: f32) {
+        if let Some(entry) = self.channels.get(channel_id) {
+            entry.vol.store((vol_frac.clamp(0.0, 1.0) * 10_000.0) as u32, Ordering::Relaxed);
+        }
+    }
+
     fn upsert(&mut self, cfg: ChannelConfig, app: tauri::AppHandle) {
         let ch_id = cfg.id.clone();
 
         if let Some(entry) = self.channels.get_mut(&ch_id) {
+            // Always sync the live volume even if nothing else changed.
+            entry.vol.store(vol_raw(cfg.volume), Ordering::Relaxed);
+
             let changed = cfg.direction != entry.last_config.direction
                 || cfg.device   != entry.last_config.device
                 || cfg.enabled  != entry.last_config.enabled;
             if changed {
                 entry.last_config = cfg.clone();
                 let _ = entry.config_tx.try_send(cfg);
+            } else {
+                entry.last_config = cfg;
             }
         } else {
-            let (tx, rx) = crossbeam_channel::bounded::<ChannelConfig>(8);
+            let vol       = Arc::new(AtomicU32::new(vol_raw(cfg.volume)));
+            let vol_clone = Arc::clone(&vol);
+            let (tx, rx)  = crossbeam_channel::bounded::<ChannelConfig>(8);
             let stop      = Arc::new(AtomicBool::new(false));
             let stop_loop = Arc::clone(&stop);
             let id        = ch_id.clone();
             let _ = tx.try_send(cfg.clone());
-            std::thread::spawn(move || channel_monitor_loop(id, rx, stop_loop, app));
-            self.channels.insert(ch_id, ChannelEntry { config_tx: tx, stop, last_config: cfg });
+            std::thread::spawn(move || channel_monitor_loop(id, rx, stop_loop, app, vol_clone));
+            self.channels.insert(ch_id, ChannelEntry { config_tx: tx, stop, last_config: cfg, vol });
         }
     }
 
@@ -89,11 +106,15 @@ impl MonitoringEngine {
     }
 }
 
+/// Convert a 0–100 config volume to the AtomicU32 storage format (0–10 000).
+fn vol_raw(volume: u32) -> u32 {
+    (volume as f32 / 100.0 * 10_000.0) as u32
+}
+
 fn should_monitor(direction: &str) -> bool {
     matches!(direction, "OUT" | "APP" | "MICOUT")
 }
 
-/// Long-running per-channel loop — never exits unless the stop flag is set.
 fn broadcast_level(app: &tauri::AppHandle, ch_id: &str, level: f32) {
     use tauri::{Emitter, Manager};
     let _ = app.emit("channel-level", serde_json::json!({ "id": ch_id, "level": level }));
@@ -109,6 +130,7 @@ fn channel_monitor_loop(
     config_rx: crossbeam_channel::Receiver<ChannelConfig>,
     stop:      Arc<AtomicBool>,
     app:       tauri::AppHandle,
+    vol:       Arc<AtomicU32>,
 ) {
     // Wait for the initial config before doing anything.
     let mut current: ChannelConfig = loop {
@@ -185,8 +207,12 @@ fn channel_monitor_loop(
             }
 
             match audio_rx.recv_timeout(Duration::from_millis(50)) {
-                Ok(samples) => {
+                Ok(mut samples) => {
                     got_audio = true;
+                    // Read the live volume (updated by set_volume() on every fader move).
+                    let vol_frac   = vol.load(Ordering::Relaxed) as f32 / 10_000.0;
+                    let multiplier = super::vol_to_multiplier(vol_frac);
+                    for s in samples.iter_mut() { *s *= multiplier; }
                     meter.push(&samples);
                     if last_emit.elapsed() >= Duration::from_millis(60) {
                         broadcast_level(&app, &ch_id, meter.level());
@@ -199,7 +225,8 @@ fn channel_monitor_loop(
                         inner_stop.store(true, Ordering::SeqCst);
                         let _ = app.emit("channel-level",
                             serde_json::json!({ "id": ch_id, "level": 0.0 }));
-                        retry_wait(&config_rx, &mut current, &stop);
+                        let dir = current.direction.clone();
+                        retry_wait(&config_rx, &mut current, &stop, &dir);
                         break 'meter;
                     }
                 }
@@ -207,7 +234,8 @@ fn channel_monitor_loop(
                     // Capture thread exited (device error, disconnected, etc) — retry.
                     let _ = app.emit("channel-level",
                         serde_json::json!({ "id": ch_id, "level": 0.0 }));
-                    retry_wait(&config_rx, &mut current, &stop);
+                    let dir = current.direction.clone();
+                    retry_wait(&config_rx, &mut current, &stop, &dir);
                     break 'meter;
                 }
             }
@@ -217,13 +245,16 @@ fn channel_monitor_loop(
     broadcast_level(&app, &ch_id, 0.0);
 }
 
-/// Wait up to 2 s between retries; returns early on config change or stop.
+/// Wait between retries; returns early on config change or stop.
+/// MICOUT reconnects faster (1 s) so mic audio returns quickly after a CPU spike.
 fn retry_wait(
     config_rx: &crossbeam_channel::Receiver<ChannelConfig>,
     current:   &mut ChannelConfig,
     stop:      &Arc<AtomicBool>,
+    direction: &str,
 ) {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let wait_secs = if direction == "MICOUT" { 1 } else { 2 };
+    let deadline = Instant::now() + Duration::from_secs(wait_secs);
     loop {
         if stop.load(Ordering::SeqCst) { return; }
         let remaining = deadline.saturating_duration_since(Instant::now());
